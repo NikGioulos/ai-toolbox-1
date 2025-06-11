@@ -1,9 +1,11 @@
 package dev.nikosg.poc.aitoolbox1.ai;
 
 import dev.nikosg.poc.aitoolbox1.awesome.RestTemplateHelper;
-import dev.nikosg.poc.aitoolbox1.tooling.ToolExecutor;
 import dev.nikosg.poc.aitoolbox1.tooling.dto.ToolCall;
 import dev.nikosg.poc.aitoolbox1.tooling.dto.ToolDef;
+import dev.nikosg.poc.aitoolbox1.tooling.registry.ToolRegistry;
+import dev.nikosg.poc.aitoolbox1.tooling.registry.ToolRegistryProvider;
+import dev.nikosg.poc.aitoolbox1.tooling.registry.ToolRegistryType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -17,20 +19,23 @@ import static dev.nikosg.poc.aitoolbox1.ai.AiMessage.*;
 
 @Service
 public class OpenAiService {
-    private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
     private final RestTemplateHelper restTemplateHelper;
-    private final ToolExecutor toolExecutor;
+    private final ToolRegistry toolRegistry;
 
-    @Value("${app.openai.apikey}")
+    @Value("${app.openai.chat.apikey}")
     private String apiKey;
 
-    public OpenAiService(RestTemplateHelper restTemplateHelper, ToolExecutor toolExecutor) {
+    @Value("${app.openai.chat.url}")
+    private String url;
+
+    public OpenAiService(RestTemplateHelper restTemplateHelper, ToolRegistryProvider toolRegistryProvider) {
         this.restTemplateHelper = restTemplateHelper;
-        this.toolExecutor = toolExecutor;
+        this.toolRegistry = toolRegistryProvider.provide(ToolRegistryType.METHOD);
     }
 
     public String chat(String userInput) throws Exception {
-        List<ToolDef> tools = toolExecutor.getToolSchemas();
+        List<ToolDef> tools = toolRegistry.getToolSchemas();
+
         List<AiMessage> messages = new ArrayList<>();
         messages.add(createUserMessage(userInput));
         return continueChat(messages, tools);
@@ -47,14 +52,14 @@ public class OpenAiService {
             requestMessages.add(createAssistantMessage(toolCalls));
 
             // call each tool
-            toolCalls.forEach(tc-> requestMessages.add(createToolMessage(tc.getId(), executeTool(tc))));
+            toolCalls.forEach(tc -> requestMessages.add(createToolMessage(tc.getId(), executeTool(tc))));
 
             // Recursive call with updated messages
             return continueChat(requestMessages, tools);
         } else {
-            // 🧠 Final response
+            // Final response
             String finalAnswer = responseMessage.getContent();
-            System.out.println("🧠 Final GPT Response:\n" + finalAnswer);
+            System.out.println("🧠 Final AI Response:\n" + finalAnswer);
             return finalAnswer;
         }
     }
@@ -63,14 +68,14 @@ public class OpenAiService {
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", MediaType.APPLICATION_JSON.toString());
         headers.put("Authorization", "Bearer " + apiKey);
-        return restTemplateHelper.postForEntity(AiResponse.class, OPENAI_API_URL, headers, request);
+        return restTemplateHelper.postForEntity(AiResponse.class, url, headers, request);
     }
 
     private String executeTool(ToolCall toolCall) {
         String name = toolCall.getFunction().getName();
         String argsJson = toolCall.getFunction().getArguments();
         try {
-            return toolExecutor.execute(name, argsJson);
+            return toolRegistry.execute(name, argsJson);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

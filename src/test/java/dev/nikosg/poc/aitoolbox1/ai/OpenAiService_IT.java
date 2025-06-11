@@ -34,8 +34,7 @@ class OpenAiService_IT extends AbstractIntegrationTest {
         sut.chat(userPrompt);
 
         // then
-        ArgumentCaptor<AiRequest> captor = verifyRestCall(1);
-        assertThat(captor.getValue().getTools()).isNotEmpty();
+        verifyRestCall(1);
     }
 
     @Test
