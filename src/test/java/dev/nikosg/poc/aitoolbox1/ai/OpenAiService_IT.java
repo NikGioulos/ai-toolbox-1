@@ -51,7 +51,7 @@ class OpenAiService_IT extends AbstractIntegrationTest {
 
 
         assertThat(captor.getAllValues().get(0).getTools()).isNotEmpty();
-        assertThat(captor.getAllValues().get(1).getTools()).isNull();
+        assertThat(captor.getAllValues().get(1).getTools()).isNotEmpty();
     }
 
     @Test

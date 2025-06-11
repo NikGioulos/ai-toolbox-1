@@ -8,9 +8,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static dev.nikosg.poc.aitoolbox1.ai.AiMessage.*;
 
 @Service
 public class OpenAiService {
@@ -26,43 +29,50 @@ public class OpenAiService {
         this.toolExecutor = toolExecutor;
     }
 
-    public void chat(String userInput) throws Exception {
+    public String chat(String userInput) throws Exception {
         List<ToolDef> tools = toolExecutor.getToolSchemas();
+        List<AiMessage> messages = new ArrayList<>();
+        messages.add(createUserMessage(userInput));
+        return continueChat(messages, tools);
+    }
 
-        // Initial request
-        AiMessage message = new AiMessage("user", userInput);
-        AiRequest request = new AiRequest(List.of(message), tools);
+    private String continueChat(List<AiMessage> requestMessages, List<ToolDef> tools) throws Exception {
+        AiRequest request = new AiRequest(requestMessages, tools);
 
+        AiResponse response = sendToAI(request);
+        AiMessage responseMessage = response.getChoices().stream().map(Choice::getMessage).findFirst().orElseThrow();
+        List<ToolCall> toolCalls = responseMessage.getToolCalls();
+        if (toolCalls != null && !toolCalls.isEmpty()) {
+            // Add assistant's message
+            requestMessages.add(createAssistantMessage(toolCalls));
+
+            // call each tool
+            toolCalls.forEach(tc-> requestMessages.add(createToolMessage(tc.getId(), executeTool(tc))));
+
+            // Recursive call with updated messages
+            return continueChat(requestMessages, tools);
+        } else {
+            // 🧠 Final response
+            String finalAnswer = responseMessage.getContent();
+            System.out.println("🧠 Final GPT Response:\n" + finalAnswer);
+            return finalAnswer;
+        }
+    }
+
+    private AiResponse sendToAI(AiRequest request) throws Exception {
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", MediaType.APPLICATION_JSON.toString());
         headers.put("Authorization", "Bearer " + apiKey);
+        return restTemplateHelper.postForEntity(AiResponse.class, OPENAI_API_URL, headers, request);
+    }
 
-        AiResponse response = restTemplateHelper.postForEntity(AiResponse.class, OPENAI_API_URL, headers, request);
-        AiMessage choiceMessage = response.getChoices().stream().map(Choice::getMessage).findFirst().orElseThrow();
-        List<ToolCall> toolCalls = choiceMessage.getToolCalls();
-        if (toolCalls != null && !toolCalls.isEmpty()) {
-            for (ToolCall toolCall : toolCalls) {
-                String id = toolCall.getId();
-                String name = toolCall.getFunction().getName();
-                String argsJson = toolCall.getFunction().getArguments();
-
-                String toolOutput = toolExecutor.execute(name, argsJson);
-
-                // Build follow-up messages
-                List<AiMessage> messages = List.of(
-                        new AiMessage("user", userInput),
-                        new AiMessage("assistant", List.of(toolCall)),
-                        new AiMessage("tool", id, toolOutput)
-                );
-
-                AiRequest secondRequest = new AiRequest(messages, tools);
-                AiResponse finalResponse = restTemplateHelper.postForEntity(AiResponse.class, OPENAI_API_URL, headers, secondRequest);
-
-                System.out.println("🧠 Response:\n" + finalResponse.getChoices().get(0).getMessage().getContent());
-            }
-        } else {
-            // If no tool_call, just print normal response
-            System.out.println("🧠 GPT Response:\n" + choiceMessage.getContent());
+    private String executeTool(ToolCall toolCall) {
+        String name = toolCall.getFunction().getName();
+        String argsJson = toolCall.getFunction().getArguments();
+        try {
+            return toolExecutor.execute(name, argsJson);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }

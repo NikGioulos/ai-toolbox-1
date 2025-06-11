@@ -17,6 +17,17 @@ public class AiMessage {
     @JsonProperty("tool_calls")
     private List<ToolCall> toolCalls;
 
+    public static AiMessage createUserMessage(String content) {
+        return new AiMessage("user", content);
+    }
+    public static AiMessage createAssistantMessage(List<ToolCall> toolCalls) {
+        return new AiMessage("assistant", toolCalls);
+    }
+
+    public static AiMessage createToolMessage(String toolId, String toolContent) {
+        return new AiMessage("tool", toolId, toolContent);
+    }
+
     public AiMessage(String role, String content) {
         this.role = role;
         this.content = content;
