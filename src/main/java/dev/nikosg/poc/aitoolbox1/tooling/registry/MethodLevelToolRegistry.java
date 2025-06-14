@@ -2,10 +2,12 @@ package dev.nikosg.poc.aitoolbox1.tooling.registry;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openai.core.JsonValue;
+import com.openai.models.FunctionDefinition;
+import com.openai.models.FunctionParameters;
+import com.openai.models.chat.completions.ChatCompletionTool;
 import dev.nikosg.poc.aitoolbox1.tooling.annotations.Tool;
 import dev.nikosg.poc.aitoolbox1.tooling.annotations.ToolParam;
-import dev.nikosg.poc.aitoolbox1.tooling.dto.ToolDef;
-import dev.nikosg.poc.aitoolbox1.tooling.dto.ToolFunctionDef;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -47,8 +49,8 @@ public class MethodLevelToolRegistry implements ToolRegistry {
     }
 
     @Override
-    public List<ToolDef> getToolSchemas() {
-        List<ToolDef> schemas = new ArrayList<>();
+    public List<ChatCompletionTool> getToolSchemas() {
+        List<ChatCompletionTool> schemas = new ArrayList<>();
 
         for (Map.Entry<String, Method> entry : toolMethods.entrySet()) {
             String name = entry.getKey();
@@ -72,10 +74,25 @@ public class MethodLevelToolRegistry implements ToolRegistry {
             );
 
 
-            schemas.add(new ToolDef(new ToolFunctionDef(tool.name(), tool.description(), parametersSchema)));
+            schemas.add(
+                    ChatCompletionTool.builder()
+                            .type(JsonValue.from("function"))
+                            .function(FunctionDefinition.builder()
+                                    .name(tool.name())
+                                    .description(tool.description())
+                                    .parameters(toFunctionParameters(parametersSchema))
+                                    .build())
+                            .build()
+            );
         }
 
         return schemas;
+    }
+
+    private FunctionParameters toFunctionParameters(Map<String, Object> parameters) {
+        FunctionParameters.Builder builder = FunctionParameters.builder();
+        parameters.forEach((key, value) -> builder.putAdditionalProperty(key, JsonValue.from(value)));
+        return builder.build();
     }
 
     @Override

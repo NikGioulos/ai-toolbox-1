@@ -1,9 +1,11 @@
 package dev.nikosg.poc.aitoolbox1.tooling.registry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openai.core.JsonValue;
+import com.openai.models.FunctionDefinition;
+import com.openai.models.FunctionParameters;
+import com.openai.models.chat.completions.ChatCompletionTool;
 import dev.nikosg.poc.aitoolbox1.tooling.ToolCallback;
-import dev.nikosg.poc.aitoolbox1.tooling.dto.ToolDef;
-import dev.nikosg.poc.aitoolbox1.tooling.dto.ToolFunctionDef;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -25,20 +27,31 @@ public class ClassLevelToolRegistry implements ToolRegistry {
     }
 
     @Override
-    public List<ToolDef> getToolSchemas() throws Exception {
-        List<ToolDef> tools = new ArrayList<>();
+    public List<ChatCompletionTool> getToolSchemas() throws Exception {
+        List<ChatCompletionTool> tools = new ArrayList<>();
         for (ToolCallback tool : toolRegistry.values()) {
+            Map<String, Object> parameters = new ObjectMapper().readValue(tool.getJsonSchema(), Map.class);
 
-            ToolFunctionDef function = new ToolFunctionDef(
-                    tool.getName(),
-                    tool.getDescription(),
-                    new ObjectMapper().readValue(tool.getJsonSchema(), Map.class)
-            );
-            ToolDef toolDef = new ToolDef(function);
+            FunctionDefinition function = FunctionDefinition.builder()
+                    .name(tool.getName())
+                    .description(tool.getDescription())
+                    .parameters(toFunctionParameters(parameters))
+                    .build();
+
+            ChatCompletionTool toolDef = ChatCompletionTool.builder()
+                    .type(JsonValue.from("function"))
+                    .function(function)
+                    .build();
 
             tools.add(toolDef);
         }
         return tools;
+    }
+
+    private FunctionParameters toFunctionParameters(Map<String, Object> parameters) {
+        FunctionParameters.Builder builder = FunctionParameters.builder();
+        parameters.forEach((key, value) -> builder.putAdditionalProperty(key, JsonValue.from(value)));
+        return builder.build();
     }
 
     @Override
