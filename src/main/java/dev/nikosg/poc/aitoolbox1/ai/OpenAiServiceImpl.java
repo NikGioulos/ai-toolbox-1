@@ -6,43 +6,45 @@ import dev.nikosg.poc.aitoolbox1.tooling.registry.ToolRegistryProvider;
 import dev.nikosg.poc.aitoolbox1.tooling.registry.ToolRegistryType;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+import javax.annotation.PostConstruct;
 import java.util.List;
 
 @Service
 public class OpenAiServiceImpl implements OpenAiService {
     private final ToolRegistry toolRegistry;
+    private final ConversationService conversationService;
     private final OpenAiClientHelper openAiClientHelper;
 
-    public OpenAiServiceImpl(ToolRegistryProvider toolRegistryProvider, OpenAiClientHelper openAiClientHelper) {
+    private List<ChatCompletionTool> tools;
+
+    public OpenAiServiceImpl(ToolRegistryProvider toolRegistryProvider, ConversationService conversationService, OpenAiClientHelper openAiClientHelper) {
         this.toolRegistry = toolRegistryProvider.provide(ToolRegistryType.METHOD);
+        this.conversationService = conversationService;
         this.openAiClientHelper = openAiClientHelper;
     }
 
     @Override
-    public String chat(String userInput) throws Exception {
-        List<ChatCompletionTool> tools = toolRegistry.getToolSchemas();
-        List<ChatCompletionMessageParam> messages = new ArrayList<>();
-        messages.add(buildUserMessageParam(userInput));
-
-        return continueChat(messages, tools);
+    public String chat(String conversationId, String userPrompt) throws Exception {
+        fetchTools();
+        conversationService.addMessage(conversationId, buildUserMessageParam(userPrompt));
+        return continueChat(conversationId);
     }
 
-    private String continueChat(List<ChatCompletionMessageParam> requestMessages, List<ChatCompletionTool> tools) {
-        ChatCompletionMessage responseMessage = sendToAI(requestMessages, tools);
+    private String continueChat(String conversationId) {
+        ChatCompletionMessage responseMessage = sendToAI(conversationId);
         if (responseMessage.toolCalls().isPresent()) {
             List<ChatCompletionMessageToolCall> toolCalls = responseMessage.toolCalls().get();
             // Add assistant's message
-            requestMessages.add(buildAssistantMessageParam(toolCalls));
+            conversationService.addMessage(conversationId, buildAssistantMessageParam(toolCalls));
 
             // call each tool
             toolCalls.forEach(tc -> {
                 String tooResponse = executeTool(tc);
-                requestMessages.add(buildToolMessageParam(tc.id(), tooResponse));
+                conversationService.addMessage(conversationId, buildToolMessageParam(tc.id(), tooResponse));
             });
 
-            // Recursive call with updated messages
-            return continueChat(requestMessages, tools);
+            // Recursive call no remaining tool to be called
+            return continueChat(conversationId);
         } else {
             // Final response
             String finalAnswer = responseMessage.content().orElseThrow();
@@ -51,8 +53,9 @@ public class OpenAiServiceImpl implements OpenAiService {
         }
     }
 
-    private ChatCompletionMessage sendToAI(List<ChatCompletionMessageParam> messages, List<ChatCompletionTool> tools) {
-        return openAiClientHelper.sendToAi(messages, tools);
+    private ChatCompletionMessage sendToAI(String conversationId) {
+        List<ChatCompletionMessageParam> conversation = conversationService.getMessages(conversationId);
+        return openAiClientHelper.sendToAi(conversation, tools);
     }
 
     private ChatCompletionMessageParam buildUserMessageParam(String content) {
@@ -73,6 +76,16 @@ public class OpenAiServiceImpl implements OpenAiService {
                         .toolCallId(toolCallId)
                         .build()
         );
+    }
+
+    private void fetchTools() {
+        try {
+            if(tools == null) {
+                tools = toolRegistry.getToolSchemas();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String executeTool(ChatCompletionMessageToolCall toolCall) {
