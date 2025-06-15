@@ -1,4 +1,4 @@
-package dev.nikosg.poc.aitoolbox1.tooling.tools.dto;
+package dev.nikosg.poc.aitoolbox1.domain;
 
 import java.math.BigDecimal;
 

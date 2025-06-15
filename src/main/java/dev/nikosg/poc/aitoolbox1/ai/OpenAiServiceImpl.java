@@ -39,8 +39,8 @@ public class OpenAiServiceImpl implements OpenAiService {
 
             // call each tool
             toolCalls.forEach(tc -> {
-                String tooResponse = executeTool(tc);
-                conversationService.addMessage(conversationId, buildToolMessageParam(tc.id(), tooResponse));
+                String toolResponse = executeTool(tc);
+                conversationService.addMessage(conversationId, buildToolMessageParam(tc.id(), toolResponse));
             });
 
             // Recursive call no remaining tool to be called

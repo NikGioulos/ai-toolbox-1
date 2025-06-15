@@ -85,6 +85,50 @@ class OpenAiServiceImpl_IT extends AbstractIntegrationTest {
         assertThat(reply2).contains("Nikos");
     }
 
+    @Test
+    void shouldExecuteTools_whenOneDto() throws Exception {
+        String userPrompt = "How much USD i get if i convert 200 CHF?";
+
+        // when
+        String reply = sut.chat(randomUUID().toString(), userPrompt);
+
+        // then
+        assertThat(reply).contains("244");
+    }
+
+    @Test
+    void shouldExecuteTools_whenOneArrayOfDto() throws Exception {
+        String userPrompt = "How much USD i get if i convert 200 CHF and how much USD i get if i convert 100 CHF?";
+
+        // when
+        String reply = sut.chat(randomUUID().toString(), userPrompt);
+
+        // then
+        assertThat(reply).contains("244");
+    }
+
+    @Test
+    void shouldExecuteTools_whenOneArrayOfString() throws Exception {
+        String userPrompt = "Which football team Peter and Tobias support?";
+
+        // when
+        String reply = sut.chat(randomUUID().toString(), userPrompt);
+
+        // then
+        assertThat(reply).contains("Arsenal");
+    }
+
+    @Test
+    void shouldExecuteTools_whenOneCollectionOfString() throws Exception {
+        String userPrompt = "Which basketball team Peter and Tobias support?";
+
+        // when
+        String reply = sut.chat(randomUUID().toString(), userPrompt);
+
+        // then
+        assertThat(reply).contains("Bulls");
+    }
+
     private ArgumentCaptor<List<ChatCompletionMessageParam>> captureAiRequestMessage(int numberOfCalls) {
         final ArgumentCaptor<List<ChatCompletionMessageParam>> captor = ArgumentCaptor.forClass(List.class);
         verify(openAiClientHelper, times(numberOfCalls)).sendToAi(captor.capture(), isNotNull());

@@ -1,6 +1,7 @@
 package dev.nikosg.poc.aitoolbox1.tooling.schema;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
@@ -73,6 +74,7 @@ public class FunctionSchemaGeneratorService implements SchemaGeneratorService {
         for (Field field : type.getDeclaredFields()) {
             if (Modifier.isStatic(field.getModifiers())) continue;
             if (field.isAnnotationPresent(JsonBackReference.class)) continue;
+            if (field.isAnnotationPresent(JsonIgnore.class)) continue;
 
             String fieldName = field.getName();
             Class<?> fieldType = field.getType();

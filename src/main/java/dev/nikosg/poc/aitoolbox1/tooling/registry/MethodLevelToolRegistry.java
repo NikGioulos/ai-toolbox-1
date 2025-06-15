@@ -2,12 +2,14 @@ package dev.nikosg.poc.aitoolbox1.tooling.registry;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.openai.core.JsonValue;
 import com.openai.models.FunctionDefinition;
 import com.openai.models.FunctionParameters;
 import com.openai.models.chat.completions.ChatCompletionTool;
 import dev.nikosg.poc.aitoolbox1.tooling.annotations.Tool;
 import dev.nikosg.poc.aitoolbox1.tooling.annotations.ToolParam;
+import dev.nikosg.poc.aitoolbox1.tooling.schema.SchemaGeneratorService;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -23,19 +25,30 @@ public class MethodLevelToolRegistry implements ToolRegistry {
     private final Map<String, Method> toolMethods = new HashMap<>();
     private final Map<String, Object> beanInstances = new HashMap<>();
     private final ListableBeanFactory beanFactory;
+    private final SchemaGeneratorService schemaGeneratorService;
+    private final ObjectMapper mapper;
 
-    public MethodLevelToolRegistry(ListableBeanFactory beanFactory) {
+    public MethodLevelToolRegistry(ListableBeanFactory beanFactory, SchemaGeneratorService schemaGeneratorService) {
         this.beanFactory = beanFactory;
+        this.schemaGeneratorService = schemaGeneratorService;
+        this.mapper = initMapper();
+    }
+
+    private ObjectMapper initMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        return mapper;
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    public void init() {
+    public void onApplicationReady() {
         for (String beanName : beanFactory.getBeanDefinitionNames()) {
+            if(!beanName.contains("Tool")) continue;
             Object bean = beanFactory.getBean(beanName);
             for (Method method : bean.getClass().getMethods()) {
                 if (method.isAnnotationPresent(Tool.class)) {
                     Tool tool = method.getAnnotation(Tool.class);
-                    String toolName = tool.name();
+                    String toolName = tool.name() == null ? method.getName() : tool.name().replace(" ", "_");
                     toolMethods.put(toolName, method);
                     beanInstances.put(toolName, bean);
                 }
@@ -55,16 +68,19 @@ public class MethodLevelToolRegistry implements ToolRegistry {
         for (Map.Entry<String, Method> entry : toolMethods.entrySet()) {
             String name = entry.getKey();
             Method method = entry.getValue();
+            if(!method.isAnnotationPresent(Tool.class)) {
+                continue;
+            }
             Tool tool = method.getAnnotation(Tool.class);
 
             Map<String, Object> properties = new LinkedHashMap<>();
-            Parameter[] parameters = method.getParameters();
-
-            for (Parameter param : parameters) {
+            for (Parameter param : method.getParameters()) {
                 ToolParam paramAnno = param.getAnnotation(ToolParam.class);
-                String paramName = paramAnno.value();
-                Map<String, Object> schema = Map.of("type", "string"); // For simplicity
-                properties.put(paramName, schema);
+                Map<String, Object> paramSchema = schemaGeneratorService.generateForClass(param.getType());
+                Map<String, Object> schema = new LinkedHashMap<>();
+                schema.put("description", paramAnno.value());
+                schema.putAll(paramSchema);
+                properties.put(param.getName(), schema);
             }
 
             Map<String, Object> parametersSchema = Map.of(
@@ -73,12 +89,11 @@ public class MethodLevelToolRegistry implements ToolRegistry {
                     "required", properties.keySet()
             );
 
-
             schemas.add(
                     ChatCompletionTool.builder()
                             .type(JsonValue.from("function"))
                             .function(FunctionDefinition.builder()
-                                    .name(tool.name())
+                                    .name(name)
                                     .description(tool.description())
                                     .parameters(toFunctionParameters(parametersSchema))
                                     .build())
@@ -96,21 +111,28 @@ public class MethodLevelToolRegistry implements ToolRegistry {
     }
 
     @Override
-    public String execute(String toolName, String jsonArgs) throws Exception {
+    public String execute(String toolName, String argumentsJson) throws Exception {
         Method method = toolMethods.get(toolName);
         Object bean = beanInstances.get(toolName);
         if (method == null || bean == null) throw new RuntimeException("Unknown tool: " + toolName);
 
+        return callMethod(method, bean, argumentsJson);
+    }
+
+    String callMethod(Method method, Object bean, String argumentsJson) throws Exception {
         Parameter[] parameters = method.getParameters();
         Object[] args = new Object[parameters.length];
-        JsonNode root = new ObjectMapper().readTree(jsonArgs);
 
+        Map<String, Object> jsonMap = mapper.readValue(argumentsJson, Map.class);
         for (int i = 0; i < parameters.length; i++) {
-            String name = parameters[i].getAnnotation(ToolParam.class).value();
-            args[i] = root.get(name).asText(); // Simplified: assumes all are strings
+            String paramName = parameters[i].getName(); // Might need parameter name discovery
+            Class<?> paramType = parameters[i].getType();
+            Object rawValue = jsonMap.get(paramName);
+            args[i] = mapper.convertValue(rawValue, paramType);
         }
 
         Object result = method.invoke(bean, args);
         return result != null ? result.toString() : "";
     }
+
 }

@@ -1,6 +1,6 @@
 package dev.nikosg.poc.aitoolbox1.tooling.schema;
 
-import dev.nikosg.poc.aitoolbox1.tooling.tools.dto.ExchangeRate;
+import dev.nikosg.poc.aitoolbox1.domain.ExchangeRate;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
