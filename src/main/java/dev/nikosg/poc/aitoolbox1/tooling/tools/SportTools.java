@@ -1,14 +1,10 @@
 package dev.nikosg.poc.aitoolbox1.tooling.tools;
 
-import dev.nikosg.poc.aitoolbox1.domain.ExchangeRate;
-import dev.nikosg.poc.aitoolbox1.service.MyService;
-import dev.nikosg.poc.aitoolbox1.service.SportService;
+import dev.nikosg.poc.aitoolbox1.backend.service.SportService;
 import dev.nikosg.poc.aitoolbox1.tooling.annotations.Tool;
 import dev.nikosg.poc.aitoolbox1.tooling.annotations.ToolParam;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.List;
 
 @Component

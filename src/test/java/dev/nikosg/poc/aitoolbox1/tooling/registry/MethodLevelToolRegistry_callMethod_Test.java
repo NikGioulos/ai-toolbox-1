@@ -1,9 +1,9 @@
 package dev.nikosg.poc.aitoolbox1.tooling.registry;
 
-import dev.nikosg.poc.aitoolbox1.domain.ExchangeRate;
-import dev.nikosg.poc.aitoolbox1.service.AmountService;
-import dev.nikosg.poc.aitoolbox1.service.MyService;
-import dev.nikosg.poc.aitoolbox1.service.SportService;
+import dev.nikosg.poc.aitoolbox1.backend.domain.ExchangeRate;
+import dev.nikosg.poc.aitoolbox1.backend.service.AmountService;
+import dev.nikosg.poc.aitoolbox1.backend.service.MyService;
+import dev.nikosg.poc.aitoolbox1.backend.service.SportService;
 import dev.nikosg.poc.aitoolbox1.tooling.tools.AmountTools;
 import dev.nikosg.poc.aitoolbox1.tooling.tools.MyTools;
 import dev.nikosg.poc.aitoolbox1.tooling.tools.SportTools;
@@ -84,20 +84,20 @@ class MethodLevelToolRegistry_callMethod_Test {
     void shouldCallMethodWithOneDtoArray() throws Exception {
         String argJson = """
                 {
-                   "exchangeRates" : [ 
+                   "exchangeRates" : [\s
                          {
                          "fromCurrency" : "CHF",
                                  "toCurrency" : "USD",
                                  "fromAmount" : 200
-                        }, 
+                        },\s
                         {
                          "fromCurrency" : "CHF",
                                  "toCurrency" : "USD",
                                  "fromAmount" : 100
-                        } 
+                        }\s
                    ]
                 }
-                """;
+               \s""";
 
         Method method = AmountTools.class.getMethod("convertAmounts", ExchangeRate[].class);
         String reply = sut.callMethod(method, amountTools, argJson);

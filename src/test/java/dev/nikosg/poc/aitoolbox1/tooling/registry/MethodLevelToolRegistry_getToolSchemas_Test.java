@@ -5,8 +5,8 @@ import com.openai.core.JsonObject;
 import com.openai.models.FunctionDefinition;
 import com.openai.models.FunctionParameters;
 import com.openai.models.chat.completions.ChatCompletionTool;
-import dev.nikosg.poc.aitoolbox1.service.AmountService;
-import dev.nikosg.poc.aitoolbox1.service.MyService;
+import dev.nikosg.poc.aitoolbox1.backend.service.AmountService;
+import dev.nikosg.poc.aitoolbox1.backend.service.MyService;
 import dev.nikosg.poc.aitoolbox1.tooling.schema.FunctionSchemaGeneratorService;
 import dev.nikosg.poc.aitoolbox1.tooling.schema.SchemaGeneratorService;
 import dev.nikosg.poc.aitoolbox1.tooling.tools.AmountTools;
@@ -24,6 +24,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,6 +46,7 @@ class MethodLevelToolRegistry_getToolSchemas_Test {
         List<ChatCompletionTool> toolSchemas = methodLevelToolRegistry.getToolSchemas();
 
         // then
+        verify(schemaGeneratorService).generateForClass(String.class);
         FunctionParameters functionParameters = getFunctionParameters(toolSchemas, "get_weather");
         assertRequired(functionParameters, "location");
         JsonObject properties = (JsonObject) functionParameters._additionalProperties().get("properties");

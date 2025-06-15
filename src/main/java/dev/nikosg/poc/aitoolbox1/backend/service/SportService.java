@@ -1,4 +1,4 @@
-package dev.nikosg.poc.aitoolbox1.service;
+package dev.nikosg.poc.aitoolbox1.backend.service;
 
 import org.springframework.stereotype.Service;
 
